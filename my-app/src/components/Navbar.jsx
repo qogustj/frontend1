@@ -6,7 +6,7 @@ function Navbar() {
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
       <div className="container">
-        <NavLink className="navbar-brand" to="/">금융 정보 포털</NavLink>
+        <NavLink className="navbar-brand" to="/">파생전략운용부</NavLink>
         <button 
           className="navbar-toggler" 
           type="button" 

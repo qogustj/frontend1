@@ -26,7 +26,7 @@ function App() {
         </main>
         <footer className="py-3 bg-light mt-auto">
           <div className="container text-center">
-            <p className="mb-0 text-muted">&copy; 2025 금융 정보 포털</p>
+            <p className="mb-0 text-muted">&copy; 2025 파생전략운용부</p>
           </div>
         </footer>
       </div>
