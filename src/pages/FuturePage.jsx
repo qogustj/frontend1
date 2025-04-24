@@ -87,7 +87,7 @@ function FuturePage() {
       <div className="card mb-4">
         <div className="card-body">
           <h5 className="card-title">데이터 조회</h5>
-          <p className="card-text">주식선물 데이터를 조회하고 자동으로 업데이트할 수 있습니다.</p>
+          <p className="card-text">주식선물 데이터를 조회하고 자동으로 업데이트할 수 있습니다. ( 데이터가 안 떠도 오류창이 안 뜨고 업데이트 시간이 증가하면 자동 조회 되는 중 입니다. )</p>
           
           <div className="d-flex flex-wrap gap-2">
             {/* 수동 데이터 조회 버튼 */}
