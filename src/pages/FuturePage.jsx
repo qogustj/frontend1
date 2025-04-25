@@ -6,13 +6,15 @@ import FutureDataTable from '../components/FutureDataTable';
 function FuturePage() {
   const [futureData, setFutureData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [updating, setUpdating] = useState(false); // 자동 업데이트 상태
+  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [autoUpdate, setAutoUpdate] = useState(false); // 자동 업데이트 활성화 여부
+  const [autoUpdate, setAutoUpdate] = useState(false);
+  const [newEntries, setNewEntries] = useState([]); // 새로운 데이터 항목 ID 저장
   
-  // 요청 취소를 위한 ref
+  // 요청 취소 및 최근 데이터 저장을 위한 ref
   const autoUpdateRef = useRef(false);
+  const lastResponseRef = useRef(null); // 이전 요청의 가장 최근 응답 저장
   
   // 데이터 로드 함수
   const loadFutureData = async () => {
@@ -29,6 +31,23 @@ function FuturePage() {
       // API 호출
       const data = await fetchFutureData();
       
+      // 이전 응답과 비교하여 새로운 공시 확인
+      if (lastResponseRef.current) {
+        // 가장 최근 응답의 시간과 새로운 응답의 시간을 비교
+        const latestEntries = findNewEntries(lastResponseRef.current, data);
+        setNewEntries(latestEntries);
+        
+        // 일정 시간(10초) 후 강조 효과 제거
+        if (latestEntries.length > 0) {
+          setTimeout(() => {
+            setNewEntries([]);
+          }, 10000);
+        }
+      }
+      
+      // 현재 응답을 저장
+      lastResponseRef.current = data;
+      
       // 데이터 설정
       setFutureData(data);
       setLastUpdated(new Date());
@@ -36,10 +55,7 @@ function FuturePage() {
       console.error('Failed to fetch future data:', err);
       setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
       
-      // 오류 발생 시 자동 업데이트 중단
-      if (autoUpdate) {
-        stopAutoUpdate();
-      }
+      // 오류 발생 시에도 자동 업데이트는 계속 (DB에서 로드하므로 임시 오류일 수 있음)
     } finally {
       // 로딩/업데이트 완료
       setLoading(false);
@@ -51,9 +67,38 @@ function FuturePage() {
           if (autoUpdateRef.current) { // 타임아웃 실행 시점에도 자동 업데이트가 활성화되어 있는지 확인
             loadFutureData();
           }
-        }, 2000); // 2초 후 다음 요청
+        }, 5000); // 5초 후 다음 요청 (이전 2초에서 변경)
       }
     }
+  };
+  
+  // 새로운 데이터 항목을 찾는 함수
+  const findNewEntries = (oldData, newData) => {
+    // 이 함수는 데이터 구조에 따라 조정해야 합니다
+    // 예시: 각 항목에 id와 timestamp가 있다고 가정
+    const newEntryIds = [];
+    
+    // newData에서 가장 최근 시간대의 항목들을 확인
+    const latestTimestamp = newData.length > 0 ? 
+      Math.max(...newData.map(item => new Date(item.timestamp).getTime())) : 0;
+    
+    if (latestTimestamp > 0) {
+      // oldData에서 가장 최근 시간대의 항목 확인
+      const oldLatestTimestamp = oldData.length > 0 ? 
+        Math.max(...oldData.map(item => new Date(item.timestamp).getTime())) : 0;
+      
+      // 최근 시간대가 다르면 새로운 항목으로 간주
+      if (latestTimestamp > oldLatestTimestamp) {
+        // 새로운 시간대의 모든 항목 ID 저장
+        newData.forEach(item => {
+          if (new Date(item.timestamp).getTime() === latestTimestamp) {
+            newEntryIds.push(item.id);
+          }
+        });
+      }
+    }
+    
+    return newEntryIds;
   };
   
   // 자동 업데이트 시작
@@ -87,7 +132,7 @@ function FuturePage() {
       <div className="card mb-4">
         <div className="card-body">
           <h5 className="card-title">데이터 조회</h5>
-          <p className="card-text">주식선물 데이터를 조회하고 자동으로 업데이트할 수 있습니다. ( 데이터가 안 떠도 오류창이 안 뜨고 업데이트 시간이 증가하면 자동 조회 되는 중 입니다. )</p>
+          <p className="card-text">주식선물 데이터를 조회하고 5초마다 자동으로 업데이트됩니다. 새로운 공시는 테두리가 강조되어 표시됩니다.</p>
           
           <div className="d-flex flex-wrap gap-2">
             {/* 수동 데이터 조회 버튼 */}
@@ -154,26 +199,19 @@ function FuturePage() {
         </div>
       )}
       
-      {/* 로딩 인디케이터 (최초 로드 시에만 표시) */}
-      {loading && futureData.length === 0 && (
-        <div className="text-center my-5">
-          <div className="spinner-border text-primary mb-3" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p className="text-muted">데이터를 불러오는 중입니다...</p>
-        </div>
-      )}
-      
       {/* 데이터 테이블 (데이터가 있을 때만 표시) */}
       {futureData.length > 0 && (
         <>
-          <FutureDataTable data={futureData} />
+          <FutureDataTable 
+            data={futureData} 
+            newEntries={newEntries} // 새로운 항목 정보 전달
+          />
           
           {/* 자동 업데이트 중이면 하단에도 상태 표시 */}
           {autoUpdate && (
             <div className="d-flex justify-content-center align-items-center mt-3 text-success">
               <div className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
-              <span>자동 업데이트 활성화됨</span>
+              <span>5초마다 자동 업데이트 중</span>
             </div>
           )}
         </>
