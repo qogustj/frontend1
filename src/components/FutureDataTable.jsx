@@ -21,22 +21,25 @@ const FutureDataTable = ({ data }) => {
         data.map(item => `${item.company}_${item.title}_${item.expandTime}`)
       );
       
-      // 이전에 없던 새 데이터 식별
-      const newIds = new Set();
-      currentDataIds.forEach(id => {
-        if (!prevDataIds.has(id)) {
-          newIds.add(id);
-        }
-      });
-      
-      // 새 데이터 ID 설정
-      if (newIds.size > 0) {
-        setNewDataIds(newIds);
+      // 이전에 데이터가 있었고, 새 데이터가 들어온 경우에만 처리
+      if (prevDataIds.size > 0) {
+        // 이전에 없던 새 데이터 식별
+        const newIds = new Set();
+        currentDataIds.forEach(id => {
+          if (!prevDataIds.has(id)) {
+            newIds.add(id);
+          }
+        });
         
-        // 10초 후에 강조 표시 제거
-        setTimeout(() => {
-          setNewDataIds(new Set());
-        }, 10000);
+        // 새 데이터 ID 설정
+        if (newIds.size > 0) {
+          setNewDataIds(newIds);
+          
+          // 10초 후에 강조 표시 제거
+          setTimeout(() => {
+            setNewDataIds(new Set());
+          }, 10000);
+        }
       }
       
       // 현재 데이터 ID를 이전 ID로 업데이트

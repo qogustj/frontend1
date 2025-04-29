@@ -32,27 +32,30 @@ function FuturePage() {
       const data = await fetchFutureData();
       
       // 새로운 데이터가 있는지 확인
-      const prevDataMap = new Map(
-        prevDataRef.current.map(item => [
-          `${item.company}_${item.title}_${item.expandTime}`, 
-          item
-        ])
-      );
-      
-      let newItems = 0;
-      data.forEach(item => {
-        const itemId = `${item.company}_${item.title}_${item.expandTime}`;
-        if (!prevDataMap.has(itemId)) {
-          newItems++;
+      // 최초 로딩이 아닌 경우에만 새 데이터 확인
+      if (prevDataRef.current.length > 0) {
+        const prevDataMap = new Map(
+          prevDataRef.current.map(item => [
+            `${item.company}_${item.title}_${item.expandTime}`, 
+            item
+          ])
+        );
+        
+        let newItems = 0;
+        data.forEach(item => {
+          const itemId = `${item.company}_${item.title}_${item.expandTime}`;
+          if (!prevDataMap.has(itemId)) {
+            newItems++;
+          }
+        });
+        
+        if (newItems > 0) {
+          setNewDataCount(newItems);
+          // 새 데이터 알림을 10초 후에 초기화
+          setTimeout(() => {
+            setNewDataCount(0);
+          }, 10000);
         }
-      });
-      
-      if (newItems > 0) {
-        setNewDataCount(newItems);
-        // 새 데이터 알림을 10초 후에 초기화
-        setTimeout(() => {
-          setNewDataCount(0);
-        }, 10000);
       }
       
       // 현재 데이터를 이전 데이터로 저장
