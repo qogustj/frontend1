@@ -10,9 +10,11 @@ function FuturePage() {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [autoUpdate, setAutoUpdate] = useState(false); // 자동 업데이트 활성화 여부
+  const [newDataCount, setNewDataCount] = useState(0); // 새로운 데이터 개수 추적
   
   // 요청 취소를 위한 ref
   const autoUpdateRef = useRef(false);
+  const prevDataRef = useRef([]); // 이전 데이터 저장용 ref
   
   // 데이터 로드 함수
   const loadFutureData = async () => {
@@ -28,6 +30,33 @@ function FuturePage() {
       
       // API 호출
       const data = await fetchFutureData();
+      
+      // 새로운 데이터가 있는지 확인
+      const prevDataMap = new Map(
+        prevDataRef.current.map(item => [
+          `${item.company}_${item.title}_${item.expandTime}`, 
+          item
+        ])
+      );
+      
+      let newItems = 0;
+      data.forEach(item => {
+        const itemId = `${item.company}_${item.title}_${item.expandTime}`;
+        if (!prevDataMap.has(itemId)) {
+          newItems++;
+        }
+      });
+      
+      if (newItems > 0) {
+        setNewDataCount(newItems);
+        // 새 데이터 알림을 10초 후에 초기화
+        setTimeout(() => {
+          setNewDataCount(0);
+        }, 10000);
+      }
+      
+      // 현재 데이터를 이전 데이터로 저장
+      prevDataRef.current = [...data];
       
       // 데이터 설정
       setFutureData(data);
@@ -132,6 +161,14 @@ function FuturePage() {
             <div className="mt-2 d-flex align-items-center text-success">
               <div className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
               <span>데이터 자동 업데이트 중...</span>
+            </div>
+          )}
+          
+          {/* 새로운 데이터 알림 */}
+          {newDataCount > 0 && (
+            <div className="mt-2 alert alert-warning d-flex align-items-center py-2" role="alert">
+              <span className="badge bg-danger me-2">NEW</span>
+              <span>새로운 데이터 {newDataCount}건이 추가되었습니다!</span>
             </div>
           )}
           
