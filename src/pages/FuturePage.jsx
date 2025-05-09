@@ -1,4 +1,3 @@
-// pages/FuturePage.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchFutureData } from '../api/futureService';
 import FutureDataTable from '../components/FutureDataTable';
@@ -11,12 +10,16 @@ function FuturePage() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [newDataCount, setNewDataCount] = useState(0);
-  // 알림음 활성화 상태 추가
+  
+  // 알림음 설정 관련 상태들
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundType, setSoundType] = useState('beep'); // 'beep', 'bell', 'chirp'
+  const [soundVolume, setSoundVolume] = useState(0.2); // 0.0 ~ 1.0
+  const [soundDuration, setSoundDuration] = useState(0.3); // 초 단위
+  const [showSoundSettings, setShowSoundSettings] = useState(false);
   
   const autoUpdateRef = useRef(false);
   const prevDataRef = useRef([]);
-  // 오디오 컨텍스트 참조 추가
   const audioContextRef = useRef(null);
   
   // 오디오 컨텍스트 초기화 함수
@@ -32,25 +35,43 @@ function FuturePage() {
   };
 
   // 알림음 재생 함수
-  const playNotificationSound = () => {
-    if (!soundEnabled || !audioContextRef.current) return;
+  const playNotificationSound = (test = false) => {
+    if ((!soundEnabled && !test) || !audioContextRef.current) return;
     
     try {
       const oscillator = audioContextRef.current.createOscillator();
       const gainNode = audioContextRef.current.createGain();
       
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(880, audioContextRef.current.currentTime); // A5 음
-      oscillator.frequency.exponentialRampToValueAtTime(440, audioContextRef.current.currentTime + 0.2); // A4 음으로 하강
+      // 소리 타입에 따른 설정
+      switch(soundType) {
+        case 'beep':
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(880, audioContextRef.current.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(440, audioContextRef.current.currentTime + soundDuration * 0.5);
+          break;
+        case 'bell':
+          oscillator.type = 'triangle';
+          oscillator.frequency.setValueAtTime(1046.5, audioContextRef.current.currentTime); // C6
+          oscillator.frequency.exponentialRampToValueAtTime(523.25, audioContextRef.current.currentTime + soundDuration * 0.7); // C5
+          break;
+        case 'chirp':
+          oscillator.type = 'sawtooth';
+          oscillator.frequency.setValueAtTime(400, audioContextRef.current.currentTime);
+          oscillator.frequency.exponentialRampToValueAtTime(900, audioContextRef.current.currentTime + soundDuration * 0.6);
+          break;
+        default:
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(880, audioContextRef.current.currentTime);
+      }
       
-      gainNode.gain.setValueAtTime(0.2, audioContextRef.current.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.3);
+      gainNode.gain.setValueAtTime(soundVolume, audioContextRef.current.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + soundDuration);
       
       oscillator.connect(gainNode);
       gainNode.connect(audioContextRef.current.destination);
       
       oscillator.start();
-      oscillator.stop(audioContextRef.current.currentTime + 0.3);
+      oscillator.stop(audioContextRef.current.currentTime + soundDuration);
     } catch (e) {
       console.error('Error playing notification sound:', e);
     }
@@ -160,6 +181,22 @@ function FuturePage() {
     setSoundEnabled(prev => !prev);
   };
 
+  // 알림음 설정 토글 함수
+  const toggleSoundSettings = () => {
+    setShowSoundSettings(prev => !prev);
+  };
+
+  // 알림음 테스트 함수
+  const testSound = () => {
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().then(() => {
+        playNotificationSound(true);
+      }).catch(console.error);
+    } else {
+      playNotificationSound(true);
+    }
+  };
+
   return (
     <div className="container py-4">
       <header className="pb-3 mb-4 border-bottom">
@@ -227,7 +264,109 @@ function FuturePage() {
                 </>
               )}
             </button>
+            
+            {/* 알림음 설정 버튼 */}
+            <button
+              className="btn btn-outline-info"
+              onClick={toggleSoundSettings}
+            >
+              <i className="bi bi-gear me-1"></i>
+              알림음 설정
+            </button>
           </div>
+          
+          {/* 알림음 설정 패널 */}
+          {showSoundSettings && (
+            <div className="card mt-3 mb-3">
+              <div className="card-body">
+                <h6 className="card-subtitle mb-3">알림음 설정</h6>
+                
+                <div className="mb-3">
+                  <label className="form-label">알림음 종류</label>
+                  <div className="btn-group w-100" role="group">
+                    <input
+                      type="radio"
+                      className="btn-check"
+                      name="soundType"
+                      id="soundTypeBeep"
+                      autoComplete="off"
+                      checked={soundType === 'beep'}
+                      onChange={() => setSoundType('beep')}
+                    />
+                    <label className="btn btn-outline-primary" htmlFor="soundTypeBeep">
+                      삐 소리
+                    </label>
+                    
+                    <input
+                      type="radio"
+                      className="btn-check"
+                      name="soundType"
+                      id="soundTypeBell"
+                      autoComplete="off"
+                      checked={soundType === 'bell'}
+                      onChange={() => setSoundType('bell')}
+                    />
+                    <label className="btn btn-outline-primary" htmlFor="soundTypeBell">
+                      종 소리
+                    </label>
+                    
+                    <input
+                      type="radio"
+                      className="btn-check"
+                      name="soundType"
+                      id="soundTypeChirp"
+                      autoComplete="off"
+                      checked={soundType === 'chirp'}
+                      onChange={() => setSoundType('chirp')}
+                    />
+                    <label className="btn btn-outline-primary" htmlFor="soundTypeChirp">
+                      짹 소리
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="mb-3">
+                  <label htmlFor="volumeRange" className="form-label">
+                    소리 크기: {Math.round(soundVolume * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    className="form-range"
+                    id="volumeRange"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={soundVolume}
+                    onChange={(e) => setSoundVolume(parseFloat(e.target.value))}
+                  />
+                </div>
+                
+                <div className="mb-3">
+                  <label htmlFor="durationRange" className="form-label">
+                    소리 길이: {soundDuration.toFixed(1)}초
+                  </label>
+                  <input
+                    type="range"
+                    className="form-range"
+                    id="durationRange"
+                    min="0.1"
+                    max="1.0"
+                    step="0.1"
+                    value={soundDuration}
+                    onChange={(e) => setSoundDuration(parseFloat(e.target.value))}
+                  />
+                </div>
+                
+                <button 
+                  className="btn btn-sm btn-primary"
+                  onClick={testSound}
+                >
+                  <i className="bi bi-play-fill me-1"></i>
+                  소리 테스트
+                </button>
+              </div>
+            </div>
+          )}
           
           {/* 업데이트 상태 표시 */}
           {updating && (
