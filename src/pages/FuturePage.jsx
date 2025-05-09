@@ -23,9 +23,13 @@ function FuturePage() {
   const [tempSoundVolume, setTempSoundVolume] = useState(0.2);
   const [tempSoundDuration, setTempSoundDuration] = useState(0.3);
   
+  // 설정 변경 추적
+  const [settingsChanged, setSettingsChanged] = useState(false);
+  
   const autoUpdateRef = useRef(false);
   const prevDataRef = useRef([]);
   const audioContextRef = useRef(null);
+  const soundSettingsRef = useRef({ type: 'beep', volume: 0.2, duration: 0.3 });
   
   // 오디오 컨텍스트 초기화 함수
   const initAudioContext = () => {
@@ -39,49 +43,60 @@ function FuturePage() {
     }
   };
 
+  // soundSettings가 변경될 때마다 ref 업데이트
+  useEffect(() => {
+    soundSettingsRef.current = {
+      type: soundType,
+      volume: soundVolume,
+      duration: soundDuration
+    };
+  }, [soundType, soundVolume, soundDuration]);
+
   // 알림음 재생 함수
-  const playNotificationSound = (test = false, testSettings = null) => {
+  const playNotificationSound = (test = false) => {
     if ((!soundEnabled && !test) || !audioContextRef.current) return;
     
     try {
-      // 테스트 설정 또는 기본 설정 사용
-      const type = testSettings?.type || soundType;
-      const volume = testSettings?.volume || soundVolume;
-      const duration = testSettings?.duration || soundDuration;
+      // 항상 현재 설정된 설정값 사용
+      const settings = test ? 
+        { type: tempSoundType, volume: tempSoundVolume, duration: tempSoundDuration } : 
+        soundSettingsRef.current;
       
       const oscillator = audioContextRef.current.createOscillator();
       const gainNode = audioContextRef.current.createGain();
       
       // 소리 타입에 따른 설정
-      switch(type) {
+      switch(settings.type) {
         case 'beep':
           oscillator.type = 'sine';
           oscillator.frequency.setValueAtTime(880, audioContextRef.current.currentTime);
-          oscillator.frequency.exponentialRampToValueAtTime(440, audioContextRef.current.currentTime + duration * 0.5);
+          oscillator.frequency.exponentialRampToValueAtTime(440, audioContextRef.current.currentTime + settings.duration * 0.5);
           break;
         case 'bell':
           oscillator.type = 'triangle';
           oscillator.frequency.setValueAtTime(1046.5, audioContextRef.current.currentTime); // C6
-          oscillator.frequency.exponentialRampToValueAtTime(523.25, audioContextRef.current.currentTime + duration * 0.7); // C5
+          oscillator.frequency.exponentialRampToValueAtTime(523.25, audioContextRef.current.currentTime + settings.duration * 0.7); // C5
           break;
         case 'chirp':
           oscillator.type = 'sawtooth';
           oscillator.frequency.setValueAtTime(400, audioContextRef.current.currentTime);
-          oscillator.frequency.exponentialRampToValueAtTime(900, audioContextRef.current.currentTime + duration * 0.6);
+          oscillator.frequency.exponentialRampToValueAtTime(900, audioContextRef.current.currentTime + settings.duration * 0.6);
           break;
         default:
           oscillator.type = 'sine';
           oscillator.frequency.setValueAtTime(880, audioContextRef.current.currentTime);
       }
       
-      gainNode.gain.setValueAtTime(volume, audioContextRef.current.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + duration);
+      gainNode.gain.setValueAtTime(settings.volume, audioContextRef.current.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + settings.duration);
       
       oscillator.connect(gainNode);
       gainNode.connect(audioContextRef.current.destination);
       
       oscillator.start();
-      oscillator.stop(audioContextRef.current.currentTime + duration);
+      oscillator.stop(audioContextRef.current.currentTime + settings.duration);
+      
+      console.log('Playing sound with settings:', settings); // 디버깅용 로그
     } catch (e) {
       console.error('Error playing notification sound:', e);
     }
@@ -93,6 +108,13 @@ function FuturePage() {
     setTempSoundType(soundType);
     setTempSoundVolume(soundVolume);
     setTempSoundDuration(soundDuration);
+    
+    // 초기 설정도 ref에 저장
+    soundSettingsRef.current = {
+      type: soundType,
+      volume: soundVolume,
+      duration: soundDuration
+    };
     
     return () => {
       autoUpdateRef.current = false;
@@ -109,8 +131,21 @@ function FuturePage() {
       setTempSoundType(soundType);
       setTempSoundVolume(soundVolume);
       setTempSoundDuration(soundDuration);
+      setSettingsChanged(false);
     }
   }, [showSoundSettings]);
+  
+  // 임시 설정값 변경 시 추적
+  useEffect(() => {
+    if (showSoundSettings) {
+      const isChanged = 
+        tempSoundType !== soundType || 
+        tempSoundVolume !== soundVolume || 
+        tempSoundDuration !== soundDuration;
+      
+      setSettingsChanged(isChanged);
+    }
+  }, [tempSoundType, tempSoundVolume, tempSoundDuration, showSoundSettings]);
   
   // 데이터 로드 함수
   const loadFutureData = async () => {
@@ -145,8 +180,9 @@ function FuturePage() {
         if (newItems > 0) {
           setNewDataCount(newItems);
           
-          // 새 데이터가 있을 때 알림음 재생
-          playNotificationSound();
+          // 새 데이터가 있을 때 알림음 재생 (현재 설정으로)
+          console.log('New data found, playing notification with current settings:', soundSettingsRef.current);
+          playNotificationSound(false);
           
           // 10초 후에 알림 초기화
           setTimeout(() => {
@@ -212,18 +248,10 @@ function FuturePage() {
   const testSound = () => {
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume().then(() => {
-        playNotificationSound(true, {
-          type: tempSoundType,
-          volume: tempSoundVolume,
-          duration: tempSoundDuration
-        });
+        playNotificationSound(true);
       }).catch(console.error);
     } else {
-      playNotificationSound(true, {
-        type: tempSoundType,
-        volume: tempSoundVolume,
-        duration: tempSoundDuration
-      });
+      playNotificationSound(true);
     }
   };
   
@@ -232,7 +260,21 @@ function FuturePage() {
     setSoundType(tempSoundType);
     setSoundVolume(tempSoundVolume);
     setSoundDuration(tempSoundDuration);
-    testSound(); // 적용 후 테스트 소리 재생
+    
+    // 설정 적용 시 ref도 바로 업데이트
+    soundSettingsRef.current = {
+      type: tempSoundType,
+      volume: tempSoundVolume,
+      duration: tempSoundDuration
+    };
+    
+    console.log('Settings applied:', soundSettingsRef.current); // 디버깅용 로그
+    
+    // 설정 변경 상태 초기화
+    setSettingsChanged(false);
+    
+    // 적용 후 테스트 소리 재생
+    testSound();
   };
   
   // 설정 취소 함수
@@ -240,13 +282,14 @@ function FuturePage() {
     setTempSoundType(soundType);
     setTempSoundVolume(soundVolume);
     setTempSoundDuration(soundDuration);
+    setSettingsChanged(false);
     setShowSoundSettings(false);
   };
 
   return (
     <div className="container py-4">
       <header className="pb-3 mb-4 border-bottom">
-        <h1 className="fw-bold">주식선물 데이터</h1>
+        <h1 className="fw-bold">주식선물 데이터(v2)</h1>
         <p className="text-muted">주식선물 가격제한폭 확대요건 정보를 확인할 수 있습니다.</p>
       </header>
       
@@ -318,6 +361,7 @@ function FuturePage() {
             >
               <i className="bi bi-gear me-1"></i>
               알림음 설정
+              {settingsChanged && <span className="badge bg-danger ms-1">!</span>}
             </button>
           </div>
           
@@ -409,12 +453,13 @@ function FuturePage() {
                     onClick={testSound}
                   >
                     <i className="bi bi-play-fill me-1"></i>
-                    현재 설정으로 테스트
+                    소리 테스트
                   </button>
                   
                   <button 
                     className="btn btn-sm btn-success"
                     onClick={applySettings}
+                    disabled={!settingsChanged}
                   >
                     <i className="bi bi-check-lg me-1"></i>
                     설정 적용
@@ -427,6 +472,16 @@ function FuturePage() {
                     <i className="bi bi-x-lg me-1"></i>
                     취소
                   </button>
+                </div>
+                
+                {/* 현재 적용된 설정 정보 */}
+                <div className="mt-3 pt-2 border-top">
+                  <p className="text-muted mb-0 small">
+                    <strong>현재 적용된 설정:</strong> {soundType === 'beep' ? '삐 소리' : 
+                      soundType === 'bell' ? '종 소리' : '짹 소리'}, 
+                    볼륨 {Math.round(soundVolume * 100)}%, 
+                    길이 {soundDuration.toFixed(1)}초
+                  </p>
                 </div>
               </div>
             </div>
